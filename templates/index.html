@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Recommendation System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Hello, {{ user['display_name'] }}!</h1>
+    <p><a href="/playlists">View your playlists</a></p>
+    <p><a href="/recommendations">Get music recommendations</a></p>
+    <p><a href="/top_tracks_artists">View your top tracks and artists</a></p>
+
+    <h2>Get Recommendations Based on a Track</h2>
+    <form action="/get_recommendations" method="post">
+        <label for="track_id">Enter a Track ID:</label>
+        <input type="text" id="track_id" name="track_id" required>
+        <button type="submit">Get Recommendations</button>
+    </form>
+</body>
+</html>

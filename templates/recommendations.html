@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Recommendations</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        // Initialize an array to store the current track IDs
+        let currentTrackIds = JSON.parse('{{ recommendations | map(attribute="id") | list | tojson | safe }}');
+
+        function addToPlaylist(form, trackId, playlistId) {
+            const formData = new FormData();
+            formData.append('track_id', trackId);
+            formData.append('playlist_id', playlistId);
+            fetch('/add_to_playlist', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const row = form.closest('tr');
+                    row.querySelector('.song-name').innerText = data.new_song.name;
+                    row.querySelector('.artist-name').innerText = data.new_song.artists[0].name;
+                    form.querySelector('input[name="track_id"]').value = data.new_song.id; // Update the hidden input
+                    form.setAttribute('onsubmit', `event.preventDefault(); addToPlaylist(this, '${data.new_song.id}', document.getElementById('playlist').value);`);
+                    // Update the currentTrackIds array
+                    const index = currentTrackIds.indexOf(trackId);
+                    if (index !== -1) {
+                        currentTrackIds[index] = data.new_song.id;
+                    }
+                    // Update the hidden input field with the current track IDs
+                    document.getElementById('track_ids').value = currentTrackIds.join(',');
+                } else {
+                    console.error('Error adding track to playlist:', data.message);
+                }
+            });
+        }
+
+        function refreshRecommendations() {
+            fetch('/refresh_recommendations', {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const tbody = document.querySelector('tbody');
+                    tbody.innerHTML = '';
+                    currentTrackIds = data.recommendations.map(song => song.id);
+                    document.getElementById('track_ids').value = currentTrackIds.join(',');
+                    data.recommendations.forEach(recommendation => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="song-name">${recommendation.name}</td>
+                            <td class="artist-name">${recommendation.artists[0].name}</td>
+                            <td>
+                                <form onsubmit="event.preventDefault(); addToPlaylist(this, '${recommendation.id}', document.getElementById('playlist').value);" style="display:inline;">
+                                    <input type="hidden" name="track_id" value="${recommendation.id}">
+                                    <button type="submit">Add to Playlist</button>
+                                </form>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    console.error('Error refreshing recommendations:', data.message);
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Music Recommendations</h1>
+
+    <h2>Save All to New Playlist</h2>
+    <form action="/save_playlist" method="post">
+        <input type="hidden" id="track_ids" name="track_ids" value="{{ recommendations | map(attribute='id') | join(',') }}">
+        <label for="playlist_name">New Playlist Name:</label>
+        <input type="text" id="playlist_name" name="playlist_name" required>
+        <button type="submit">Save to Spotify</button>
+    </form>
+
+    <h2>Add to Existing Playlist</h2>
+    <form id="playlist-form" action="/add_to_playlist" method="post">
+        <label for="playlist">Choose a playlist:</label>
+        <select id="playlist" name="playlist_id">
+            {% for playlist in playlists %}
+                <option value="{{ playlist.id }}">{{ playlist.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <button onclick="refreshRecommendations()">Refresh Recommendations</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Song</th>
+                <th>Artist</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for recommendation in recommendations %}
+            <tr>
+                <td class="song-name">{{ recommendation.name }}</td>
+                <td class="artist-name">{{ recommendation.artists[0].name }}</td>
+                <td>
+                    <form onsubmit="event.preventDefault(); addToPlaylist(this, '{{ recommendation.id }}', document.getElementById('playlist').value);" style="display:inline;">
+                        <input type="hidden" name="track_id" value="{{ recommendation.id }}">
+                        <button type="submit">Add to Playlist</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p><a href="/home">Back to Home</a></p>
+</body>
+</html>
