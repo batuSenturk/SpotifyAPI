@@ -6,7 +6,6 @@
     <title>Music Recommendations</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
-        // Initialize an array to store the current track IDs
         let currentTrackIds = JSON.parse('{{ recommendations | map(attribute="id") | list | tojson | safe }}');
 
         function addToPlaylist(form, trackId, playlistId) {
@@ -23,14 +22,13 @@
                     const row = form.closest('tr');
                     row.querySelector('.song-name').innerText = data.new_song.name;
                     row.querySelector('.artist-name').innerText = data.new_song.artists[0].name;
+                    row.querySelector('img').src = data.new_song.album.images[0].url; // Update the album cover image
                     form.querySelector('input[name="track_id"]').value = data.new_song.id; // Update the hidden input
                     form.setAttribute('onsubmit', `event.preventDefault(); addToPlaylist(this, '${data.new_song.id}', document.getElementById('playlist').value);`);
-                    // Update the currentTrackIds array
                     const index = currentTrackIds.indexOf(trackId);
                     if (index !== -1) {
                         currentTrackIds[index] = data.new_song.id;
                     }
-                    // Update the hidden input field with the current track IDs
                     document.getElementById('track_ids').value = currentTrackIds.join(',');
                 } else {
                     console.error('Error adding track to playlist:', data.message);
@@ -52,7 +50,11 @@
                     data.recommendations.forEach(recommendation => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
-                            <td class="song-name">${recommendation.name}</td>
+                            <td>${recommendation.rank}</td>
+                            <td>
+                                <img src="${recommendation.image}" alt="${recommendation.name}" width="50">
+                                <span class="song-name">${recommendation.name}</span>
+                            </td>
                             <td class="artist-name">${recommendation.artists[0].name}</td>
                             <td>
                                 <form onsubmit="event.preventDefault(); addToPlaylist(this, '${recommendation.id}', document.getElementById('playlist').value);" style="display:inline;">
@@ -96,7 +98,8 @@
     <table>
         <thead>
             <tr>
-                <th>Song</th>
+                <th>Ranking</th>
+                <th>Track</th>
                 <th>Artist</th>
                 <th></th>
             </tr>
@@ -104,7 +107,11 @@
         <tbody>
             {% for recommendation in recommendations %}
             <tr>
-                <td class="song-name">{{ recommendation.name }}</td>
+                <td>{{ recommendation.rank }}</td>
+                <td>
+                    <img src="{{ recommendation.image }}" alt="{{ recommendation.name }}" width="50">
+                    <span class="song-name">{{ recommendation.name }}</span>
+                </td>
                 <td class="artist-name">{{ recommendation.artists[0].name }}</td>
                 <td>
                     <form onsubmit="event.preventDefault(); addToPlaylist(this, '{{ recommendation.id }}', document.getElementById('playlist').value);" style="display:inline;">
