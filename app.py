@@ -59,9 +59,13 @@ def top_tracks_artists():
     if not token_info:
         return redirect('/')
     sp = spotipy.Spotify(auth=token_info['access_token'])
+    
+    time_range = request.args.get('time_range', 'medium_term')
+    
     try:
-        top_tracks = sp.current_user_top_tracks(limit=10)['items']
-        top_artists = sp.current_user_top_artists(limit=10)['items']
+        top_tracks = sp.current_user_top_tracks(limit=10, time_range=time_range)['items']
+        top_artists = sp.current_user_top_artists(limit=10, time_range=time_range)['items']
+        
         top_tracks_with_images = [
             {
                 'rank': i+1,
@@ -71,6 +75,7 @@ def top_tracks_artists():
             }
             for i, track in enumerate(top_tracks)
         ]
+        
         top_artists_with_images = [
             {
                 'rank': i+1,
@@ -79,7 +84,8 @@ def top_tracks_artists():
             }
             for i, artist in enumerate(top_artists)
         ]
-        return render_template('top_tracks_artists.html', top_tracks=top_tracks_with_images, top_artists=top_artists_with_images)
+        
+        return render_template('top_tracks_artists.html', top_tracks=top_tracks_with_images, top_artists=top_artists_with_images, time_range=time_range)
     except Exception as e:
         return f"Error fetching top tracks and artists: {e}"
 
@@ -108,8 +114,19 @@ def recommendations():
         seed_tracks = ['3n3Ppam7vgaVa1iaRUc9Lp']  # Example track ID
         recommendations = get_recommendations(sp, seed_tracks[0])
         playlists = get_all_playlists(sp)
+        
+        recommendations_with_images = [
+            {
+                'rank': i + 1,
+                'id': track['id'],
+                'name': track['name'],
+                'artists': [{'name': artist['name']} for artist in track['artists']],
+                'image': track['album']['images'][0]['url']
+            }
+            for i, track in enumerate(recommendations)
+        ]
 
-        return render_template('recommendations.html', recommendations=recommendations, playlists=playlists, selected_playlist_id=playlists[0]['id'])
+        return render_template('recommendations.html', recommendations=recommendations_with_images, playlists=playlists, selected_playlist_id=playlists[0]['id'])
     except Exception as e:
         return f"Error fetching recommendations: {e}"
 
@@ -124,7 +141,18 @@ def get_recommendations_route():
         recommendations = get_recommendations(sp, track_id)
         playlists = get_all_playlists(sp)
 
-        return render_template('recommendations.html', recommendations=recommendations, playlists=playlists, selected_playlist_id=playlists[0]['id'])
+        recommendations_with_images = [
+            {
+                'rank': i + 1,
+                'id': track['id'],
+                'name': track['name'],
+                'artists': [{'name': artist['name']} for artist in track['artists']],
+                'image': track['album']['images'][0]['url']
+            }
+            for i, track in enumerate(recommendations)
+        ]
+
+        return render_template('recommendations.html', recommendations=recommendations_with_images, playlists=playlists, selected_playlist_id=playlists[0]['id'])
     except Exception as e:
         return f"Error fetching recommendations: {e}"
 
@@ -141,7 +169,15 @@ def add_to_playlist():
         # Get a new recommendation to replace the added song
         new_recommendations = sp.recommendations(seed_tracks=[track_id], limit=1)
         new_song = new_recommendations['tracks'][0]
-        return jsonify({'status': 'success', 'new_song': new_song})
+        new_song_info = {
+            'id': new_song['id'],
+            'name': new_song['name'],
+            'artists': [{'name': artist['name']} for artist in new_song['artists']],
+            'album': {
+                'images': new_song['album']['images']
+            }
+        }
+        return jsonify({'status': 'success', 'new_song': new_song_info})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
@@ -170,13 +206,16 @@ def refresh_recommendations():
     try:
         seed_tracks = ['3n3Ppam7vgaVa1iaRUc9Lp']  # Example track ID
         recommendations = get_recommendations(sp, seed_tracks[0])
-        recommendations_info = []
-        for track in recommendations:
-            recommendations_info.append({
+        recommendations_info = [
+            {
+                'rank': i + 1,
                 'id': track['id'],
                 'name': track['name'],
-                'artists': [{'name': artist['name']} for artist in track['artists']]
-            })
+                'artists': [{'name': artist['name']} for artist in track['artists']],
+                'image': track['album']['images'][0]['url']
+            }
+            for i, track in enumerate(recommendations)
+        ]
         return jsonify({'status': 'success', 'recommendations': recommendations_info})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
@@ -192,6 +231,35 @@ def recently_played():
         return render_template('recently_played.html', recently_played=recently_played)
     except Exception as e:
         return f"Error fetching recently played tracks: {e}"
+    
+@app.route('/create_top_50_playlist', methods=['POST'])
+def create_top_50_playlist():
+    token_info = session.get('token_info', None)
+    if not token_info:
+        return jsonify({'status': 'error', 'message': 'Token not found'})
+    
+    sp = spotipy.Spotify(auth=token_info['access_token'])
+    data = request.get_json()
+    time_range = data.get('time_range', 'medium_term')
+    playlist_name = data.get('playlist_name', 'Top 50')
+
+    try:
+        # Fetch the top 50 tracks for the selected time range
+        top_tracks = sp.current_user_top_tracks(limit=50, time_range=time_range)['items']
+        track_ids = [track['id'] for track in top_tracks]
+
+        # Create a new playlist
+        user_id = sp.current_user()['id']
+        playlist = sp.user_playlist_create(user=user_id, name=playlist_name, public=False)
+        playlist_id = playlist['id']
+
+        # Add tracks to the playlist
+        sp.playlist_add_items(playlist_id, track_ids)
+
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
 
 if __name__ == '__main__':
     app.run(port=8888)
