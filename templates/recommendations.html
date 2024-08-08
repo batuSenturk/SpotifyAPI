@@ -7,6 +7,31 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
         let currentTrackIds = JSON.parse('{{ recommendations | map(attribute="id") | list | tojson | safe }}');
+        let audio = new Audio();
+        let currentlyPlayingButton = null;
+
+        function playPreview(previewUrl, button) {
+            if (audio.src !== previewUrl) {
+                audio.src = previewUrl;
+                audio.play();
+                if (currentlyPlayingButton) {
+                    currentlyPlayingButton.innerText = "Play";
+                }
+                button.innerText = "Pause";
+                currentlyPlayingButton = button;
+            } else {
+                if (audio.paused) {
+                    audio.play();
+                    button.innerText = "Pause";
+                } else {
+                    audio.pause();
+                    button.innerText = "Play";
+                }
+            }
+            audio.onended = () => {
+                button.innerText = "Play";
+            };
+        }
 
         function addToPlaylist(form, trackId, playlistId) {
             const formData = new FormData();
@@ -51,6 +76,7 @@
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td>${recommendation.rank}</td>
+                            <td><button onclick="playPreview('${recommendation.preview_url}', this)">Play</button></td>
                             <td>
                                 <img src="${recommendation.image}" alt="${recommendation.name}" width="50">
                                 <span class="song-name">${recommendation.name}</span>
@@ -99,6 +125,7 @@
         <thead>
             <tr>
                 <th>Ranking</th>
+                <th>Play</th>
                 <th>Track</th>
                 <th>Artist</th>
                 <th></th>
@@ -108,6 +135,7 @@
             {% for recommendation in recommendations %}
             <tr>
                 <td>{{ recommendation.rank }}</td>
+                <td><button onclick="playPreview('{{ recommendation.preview_url }}', this)">Play</button></td>
                 <td>
                     <img src="{{ recommendation.image }}" alt="{{ recommendation.name }}" width="50">
                     <span class="song-name">{{ recommendation.name }}</span>
