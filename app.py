@@ -121,7 +121,8 @@ def recommendations():
                 'id': track['id'],
                 'name': track['name'],
                 'artists': [{'name': artist['name']} for artist in track['artists']],
-                'image': track['album']['images'][0]['url']
+                'image': track['album']['images'][0]['url'],
+                'preview_url': track['preview_url']  # Add preview URL
             }
             for i, track in enumerate(recommendations)
         ]
@@ -129,6 +130,7 @@ def recommendations():
         return render_template('recommendations.html', recommendations=recommendations_with_images, playlists=playlists, selected_playlist_id=playlists[0]['id'])
     except Exception as e:
         return f"Error fetching recommendations: {e}"
+
 
 @app.route('/get_recommendations', methods=['POST'])
 def get_recommendations_route():
